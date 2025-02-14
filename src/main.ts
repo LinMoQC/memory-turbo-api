@@ -8,6 +8,7 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import * as dotenv from 'dotenv';
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import { ServerOptions } from 'socket.io';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 // 加载 .env 文件
 dotenv.config();
@@ -40,6 +41,17 @@ async function bootstrap() {
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     credentials: true,
   });
+
+  // 配置 Swagger
+  const config = new DocumentBuilder()
+    .setTitle('Memory API')
+    .setDescription('Memory Flow API 文档')
+    .setVersion('1.0')
+    .addBearerAuth() // 添加 JWT 认证
+    .build();
+
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api/docs', app, document);
 
   // 启用全局校验管道
   app.useGlobalPipes(new ValidationPipe({
