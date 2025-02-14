@@ -1,0 +1,96 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model permissions {
+  id               Int                @id @default(autoincrement())
+  name             String             @unique @db.VarChar(50)
+  description      String?
+  role_permissions role_permissions[]
+}
+
+model role_permissions {
+  role_id       Int
+  permission_id Int
+  permissions   permissions @relation(fields: [permission_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  roles         roles       @relation(fields: [role_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([role_id, permission_id])
+}
+
+model roles {
+  id               Int                @id @default(autoincrement())
+  name             String             @unique @db.VarChar(50)
+  description      String?
+  role_permissions role_permissions[]
+  users            users[]
+}
+
+model users {
+  id                Int                 @id @default(autoincrement())
+  username          String              @unique @db.VarChar(50)
+  password          String              @db.VarChar(255)
+  email             String              @unique @db.VarChar(100)
+  avatar            String?             @db.VarChar(255)
+  role_id           Int?                @default(1)
+  status            Int                 @default(1) // 0: 禁用, 1: 正常, 2: 待审核
+  last_login_at     DateTime?           // 上次登录时间
+  created_at        DateTime?           @default(now()) @db.Timestamp(6)
+  updated_at        DateTime?           @default(now()) @db.Timestamp(6) @updatedAt
+  lowcode_templates lowcode_templates[]
+  notifications     notifications[]
+  roles             roles?              @relation(fields: [role_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+
+model lowcode_template_status {
+  id          Int      @id @default(autoincrement())
+  status_name String   @unique @db.VarChar(50)
+  next_status String
+  is_terminal Boolean? @default(false)
+}
+
+model lowcode_templates {
+  id            Int       @id @default(autoincrement())
+  template_name String?   @db.VarChar(100)
+  template_json String?
+  created_at    DateTime? @default(now()) @db.Timestamp(6)
+  updated_at    DateTime? @default(now()) @db.Timestamp(6) @updatedAt
+  username      String?   @db.VarChar(100)
+  status        String?   @default("draft") @db.VarChar(50)
+  template_key  String    @unique @db.VarChar(255)
+  users         users?    @relation(fields: [username], references: [username], onDelete: Cascade, map: "fk_username")
+
+  @@index([username], map: "idx_lowcode_templates_username")
+}
+
+model notification_types {
+  id            Int             @id @default(autoincrement())
+  name          String          @unique @db.VarChar(255)
+  notifications notifications[]
+}
+
+model notifications {
+  id                 Int                  @id @default(autoincrement())
+  username           String               // 关联 users 表的 username
+  type_id            Int
+  target_id          Int?
+  message            String
+  status             notification_status? @default(unread)
+  created_at         DateTime?            @default(now()) @db.Timestamp(6)
+  updated_at         DateTime?            @default(now()) @db.Timestamp(6)
+  extra_data         String?
+  notification_types notification_types   @relation(fields: [type_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users              users                @relation(fields: [username], references: [username], onDelete: Cascade, onUpdate: NoAction)
+}
+
+enum notification_status {
+  unread
+  read
+  archived
+}
