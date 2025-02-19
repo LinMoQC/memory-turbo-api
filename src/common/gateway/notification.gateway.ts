@@ -6,8 +6,9 @@ import {
   ConnectedSocket,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import * as cookie from 'cookie';
 import { Roles } from '@memory/shared';
+import { UnauthorizedException } from '@nestjs/common';
+import { verifyAccessToken } from 'src/utils/jwt-utils';
 
 @WebSocketGateway({ namespace: '/ws' })
 export class NotificationGateway {
@@ -19,19 +20,21 @@ export class NotificationGateway {
   private AdminQueue: Map<string, { id: string; username: string; socket: Socket }> = new Map();
 
   // 监听连接事件
-  handleConnection(client: Socket): void {
-    const cookies = client.handshake.headers.cookie;
+  async handleConnection(client: Socket): Promise<void> {
 
-    if (cookies) {
-      const parsedCookies = cookie.parse(cookies);
-      const role = parsedCookies['Role'];
+    const token = client.handshake.auth.accessToken;
+    if (!token) {
+      throw new UnauthorizedException('Token is required');
+    }
+
+    if (token) {
+      const userInfo = await verifyAccessToken(token)
+      const role = userInfo.role
 
       try {
-        const parsedRole = JSON.parse(role.slice(2)); // 解析 Role 字段，去掉前缀 "j:"
-
-        const username = parsedRole.username;
+        const username = userInfo.username
         const userId = client.id; 
-        const userType = Roles[parsedRole.role_id];
+        const userType = Roles[role];
 
         const userData = { id: userId, username, socket: client };
 

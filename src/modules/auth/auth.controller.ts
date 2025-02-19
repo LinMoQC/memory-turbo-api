@@ -27,6 +27,12 @@ export class AuthController {
   }
 
   @HttpCode(201)
+  @Post('init')
+  init(@Body() registerDto: RegisterDto){
+    return this.authService.Init(registerDto)
+  }
+
+  @HttpCode(201)
   @Post('forget')
   forget(@Body() forgetDTO: ForgetDTO){
     return this.authService.Forget(forgetDTO)

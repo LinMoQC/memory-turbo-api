@@ -18,7 +18,7 @@ export class LowcodeController {
   }
 
   @HttpCode(200)
-  @Role('admin')
+  @Role('admin', 'super')
   @Post('pendings')
   getPendings(
     @Query('page') page: number = 1,
@@ -34,14 +34,14 @@ export class LowcodeController {
   }
 
   @HttpCode(200)
-  @Role('admin')
+  @Role('admin','super')
   @Post('approve-request') // 批准请求
   approveRequest(@Body('templateKey') templateKey: string) {
     return this.lowcodeService.approveRequest(templateKey);
   }
 
   @HttpCode(200)
-  @Role('admin')
+  @Role('admin','super')
   @Post('reject-request') // 拒绝请求
   rejectRequest(@Body('templateKey') templateKey: string) {
     return this.lowcodeService.rejectRequest(templateKey);

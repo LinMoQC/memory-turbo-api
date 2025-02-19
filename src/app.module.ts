@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, RequestMethod } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './modules/auth/auth.module';
@@ -11,6 +11,7 @@ import { NotificationModule } from './modules/notification/notification.module';
 import { RoleModule } from './modules/role/role.module';
 import { MailService } from './modules/mail/mail.service';
 import { GithubService } from './modules/oauth/github/github.service';
+import { JwtAuthMiddleware } from './common/middlewares/jwt.middleware';
 
 
 
@@ -19,4 +20,12 @@ import { GithubService } from './modules/oauth/github/github.service';
   controllers: [AppController],
   providers: [AppService, PrismaService,NotificationGateway, NotificationService, MailService, GithubService],
 })
-export class AppModule {}
+export class AppModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer
+      .apply(JwtAuthMiddleware)
+      // 排除auth
+      .exclude({ path: '/auth/(.*)', method: RequestMethod.ALL })
+      .forRoutes('*');
+  }
+}

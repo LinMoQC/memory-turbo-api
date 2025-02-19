@@ -3,7 +3,6 @@ import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 import * as cookieParser from 'cookie-parser';
-import { JwtAuthGuard } from './common/guards/jwt-auth-guard.guard';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import * as dotenv from 'dotenv';
 import { IoAdapter } from '@nestjs/platform-socket.io';
@@ -58,9 +57,6 @@ async function bootstrap() {
     transform: true,
     whitelist: true,
   }));
-
-  // 使用全局 JWT 验证守卫
-  app.useGlobalGuards(new JwtAuthGuard());
 
   // 使用全局响应拦截器
   app.useGlobalInterceptors(new ResponseInterceptor());

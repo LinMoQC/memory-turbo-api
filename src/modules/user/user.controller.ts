@@ -1,6 +1,6 @@
 import { Controller, Get, Body, HttpCode, Req, Res, UseGuards, Post, Param, Delete } from '@nestjs/common';
 import { UserService } from './user.service';
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { RoleGuard } from 'src/common/guards/role-guard.guard';
 import { Role } from 'src/common/decorators/role.decorator';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -18,14 +18,15 @@ export class UserController {
   }
 
   @HttpCode(200)
-  @Role('admin')
+  @Role('admin', 'super')
   @Post(':name')
-  update(@Param('name') name: string,@Body() updateDTO: UpdateUserDto){
-    return this.userService.update(name,updateDTO)
+  update(@Param('name') name: string,@Body() updateDTO: UpdateUserDto,@Req() request: Request){
+    const user = request.user
+    return this.userService.update(name,updateDTO,user.role)
   }
 
   @HttpCode(200)
-  @Role('admin')
+  @Role('admin', 'super')
   @Delete(':name')
   delete(@Param('name') name: string){
     return this.userService.delete(name)
@@ -38,7 +39,7 @@ export class UserController {
   }
 
   @HttpCode(200)
-  @Role('admin')
+  @Role('admin', 'super')
   @Get('all')
   getUsers(){
     return this.userService.getUsers()

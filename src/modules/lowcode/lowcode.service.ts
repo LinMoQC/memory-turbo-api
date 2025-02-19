@@ -66,7 +66,6 @@ export class LowcodeService {
   }
 
   async updateByTemplateKey(key: string, template: UpdateLowcodeDto | null = null, status?: templateStatusEnum) {
-    console.log(key)
     try {
       if (template) {
         const updatedTemplate = await this.prisma.lowcode_templates.update({

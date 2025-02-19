@@ -12,6 +12,8 @@ import { MailService } from '../mail/mail.service';
 import { createCache, Cache } from 'cache-manager';
 import Keyv from 'keyv';
 import { ForgetDTO } from './dto/forget-auth.dto';
+import * as path from 'path';
+import { promises as fs } from 'fs';
 
 @Injectable()
 export class AuthService {
@@ -66,6 +68,29 @@ export class AuthService {
     const { emailCode, ...userData } = registerDTO;
 
     return this.userService.create(userData);
+  }
+
+  async Init(registerDTO: RegisterDto): Promise<{ msg: string }> {
+    const filePath = path.join(process.cwd(), 'memory.lock');
+
+    try {
+      // 检查 memory.lock 是否存在
+      await fs.access(filePath);
+      throw new BadRequestException('非法访问！')
+    } catch (error) {
+      console.log('memory.lock 不存在，开始初始化...');
+      try {
+        await this.verifyCode(registerDTO.email, registerDTO.emailCode)
+        const { emailCode, ...userData } = registerDTO;
+        await this.userService.super(userData);
+        await fs.writeFile(filePath, 'initialized');
+
+        return { msg: '初始化成功' };
+      } catch (userError) {
+        console.error('初始化失败:', userError);
+        throw new BadRequestException('初始化失败，请检查日志');
+      }
+    }
   }
 
   // 忘记接口
@@ -133,7 +158,6 @@ export class AuthService {
       const code = Math.floor(100000 + Math.random() * 900000).toString();
       await this.cache.set(`verify_${email}`, code, 60 * 1000);
       await this.cache.set(lockKey, true, 60 * 1000);
-      console.log(email, code)
       await this.mailService.sendVerificationEmail(email, code)
       return { message: '验证码已发送，请检查邮箱' };
     } catch {

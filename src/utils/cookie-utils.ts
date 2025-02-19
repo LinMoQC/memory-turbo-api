@@ -1,13 +1,6 @@
 import { Injectable, Res } from '@nestjs/common';
 import { Response, Request } from 'express';
 
-
-export class RoleType {
-    username: string;
-    role_id: number;
-}
-
-
 /**
  * Cookie 服务提供清除、设置和获取 Token 的功能。
  */
@@ -29,7 +22,7 @@ export class CookieService {
         });
     }
 
-    setRoleCookie(response: Response,role: RoleType, maxAge: number,httpOnly: boolean): void {
+    setRoleCookie(response: Response,role: number, maxAge: number,httpOnly: boolean): void {
         response.cookie('Role', role, {
             httpOnly: httpOnly,
             maxAge,

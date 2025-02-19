@@ -1,5 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { RegisterDto } from 'src/modules/auth/dto/register-auth.dto';
+import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { hash } from 'argon2';
 import { PrismaService } from '../prisma/prisma.service';
 import { CookieService } from 'src/utils/cookie-utils';
@@ -55,7 +54,7 @@ export class UserService {
       if (!user || !user.status) {
         throw new UnauthorizedException("User Not Found")
       }
-      this.cookieService.setRoleCookie(res, {username: user.username,role_id: user.role_id}, 30 * 60 * 1000, true);
+      this.cookieService.setRoleCookie(res, user.role_id, 30 * 60 * 1000, true);
 
       const userInfo = {
         id: user.id,
@@ -97,7 +96,10 @@ export class UserService {
     })
   }
 
-  async update(username: string,updateDTO: UpdateUserDto){
+  async update(username: string,updateDTO: UpdateUserDto,role: number){
+    const target = await this.findByName(username)
+    // 越权
+    if(target.role_id > role) throw new BadRequestException('非法操作')
      try{
       const res = await this.prisma.users.update({
         where: {username},
@@ -119,5 +121,19 @@ export class UserService {
     return this.prisma.users.delete({
       where: {username}
     })
+  }
+
+  async super(createUserDto: CreateUserDto){
+    const { password, ...user } = createUserDto;
+    const hashedPassword = await hash(password);
+    return await this.prisma.users.create({
+      data: {
+        password: hashedPassword,
+        roles: {
+          connect: { id: 3 }
+        },
+        ...user,
+      },
+    });
   }
 }
