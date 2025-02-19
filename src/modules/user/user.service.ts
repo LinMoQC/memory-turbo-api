@@ -70,16 +70,18 @@ export class UserService {
     }
   }
 
-  async getAllAdmin(): Promise<AdminInfo[]>{
+  async getAllAdmin(): Promise<AdminInfo[]> {
     return await this.prisma.users.findMany({
-      where: { role_id: 2 },
+      where: {
+        role_id: { in: [2, 3] }
+      },
       select: {
         username: true,
         avatar: true,
         email: true
       }
-    })
-  }
+    });
+  }  
 
   async getUsers(){
     return this.prisma.users.findMany({

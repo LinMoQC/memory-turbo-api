@@ -7,7 +7,6 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { Roles } from '@memory/shared';
-import { UnauthorizedException } from '@nestjs/common';
 import { verifyAccessToken } from 'src/utils/jwt-utils';
 
 @WebSocketGateway({ namespace: '/ws' })
@@ -23,9 +22,6 @@ export class NotificationGateway {
   async handleConnection(client: Socket): Promise<void> {
 
     const token = client.handshake.auth.accessToken;
-    if (!token) {
-      throw new UnauthorizedException('Token is required');
-    }
 
     if (token) {
       const userInfo = await verifyAccessToken(token)
@@ -38,7 +34,7 @@ export class NotificationGateway {
 
         const userData = { id: userId, username, socket: client };
 
-        if (userType === 'admin') {
+        if (userType === 'admin' || userType === 'super') {
           this.AdminQueue.set(username, userData);
         } else {
           this.PublicQueue.set(username, userData);
