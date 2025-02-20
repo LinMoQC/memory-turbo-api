@@ -9,7 +9,7 @@ export class UpdateUserDto {
     email?: string;
 
     @IsNumber()
-    role_id?: number;
+    role?: number;
 
     @IsNumber()
     status?: number;

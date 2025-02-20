@@ -1,4 +1,4 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import { ConflictException, Inject, Injectable } from '@nestjs/common';
 import { CreateLowcodeDto } from './dto/create-lowcode.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateLowcodeDto } from './dto/update-lowcode.dto';
@@ -8,11 +8,14 @@ import { templateStatusEnum } from '@memory/shared';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationGateway } from 'src/common/gateway/notification.gateway';
 import { Roles } from '@memory/shared';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
+import { LowcodeTemplateDTO } from 'src/shared/lowcode-dto';
 
 @Injectable()
 export class LowcodeService {
 
-  constructor(private readonly prisma: PrismaService,private readonly notificationService: NotificationService,private readonly notification: NotificationGateway) { }
+  constructor(private readonly prisma: PrismaService,private readonly notificationService: NotificationService,private readonly notification: NotificationGateway,@Inject(CACHE_MANAGER) private cacheManager: Cache) { }
 
   async create(createLowcodeDto: CreateLowcodeDto) {
     const { template_name, template_json, username } = createLowcodeDto
@@ -22,7 +25,7 @@ export class LowcodeService {
     });
 
     if (isExist) {
-      throw new ConflictException('Template with this name already exists');
+      throw new ConflictException('模版已存在');
     }
 
     const templateKey = uuidv4();
@@ -41,7 +44,7 @@ export class LowcodeService {
 
   async findAll(username: string,role: number) {
     // 管理员可以看到所有的模版
-    if(role === Roles.admin){
+    if(role >= Roles.admin){
       return this.prisma.lowcode_templates.findMany()
     }else{
       // 非管理只能看自己创建的
@@ -53,37 +56,41 @@ export class LowcodeService {
     }
   }
 
-  async deleteByTemplateKey(key: string) {
+  async deleteByTemplateKey(key: string): Promise<LowcodeTemplateDTO> {
     return this.prisma.lowcode_templates.delete({
       where: { template_key: key }
     })
   }
 
-  async findByTemplateKey(key: string) {
-    return this.prisma.lowcode_templates.findUnique({
-      where: { template_key: key }
-    });
+  async findByTemplateKey(key: string): Promise<LowcodeTemplateDTO> {
+    const cacheKey = `lowcode:template:${key}`;
+    let template = await this.cacheManager.get<LowcodeTemplateDTO>(cacheKey);
+
+    if (!template) {
+      template = await this.prisma.lowcode_templates.findUnique({
+        where: { template_key: key },
+      });
+      if (template) {
+        await this.cacheManager.set<LowcodeTemplateDTO>(cacheKey, template, 6000);  // 缓存 1分钟
+      }
+    }
+
+    return template;
   }
 
   async updateByTemplateKey(key: string, template: UpdateLowcodeDto | null = null, status?: templateStatusEnum) {
     try {
-      if (template) {
-        const updatedTemplate = await this.prisma.lowcode_templates.update({
-          where: { template_key: key },
-          data: template,
-        });
+      const updatedTemplate = await this.prisma.lowcode_templates.update({
+        where: { template_key: key },
+        data: template ? template : { status },
+      });
 
-        return updatedTemplate;
-      } else {
-        const updatedTemplate = await this.prisma.lowcode_templates.update({
-          where: { template_key: key },
-          data: {
-            status
-          },
-        });
+      // 更新模板缓存
+      await this.cacheManager.set(`lowcode:template:${key}`, updatedTemplate, 60000);
 
-        return updatedTemplate
-      }
+      return {
+        msg: '模版更新成功'
+      };
     } catch (error) {
       throw new ConflictException('模版更新失败');
     }

@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, ForbiddenException, HttpException, HttpStatus, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, HttpException, HttpStatus, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { UserService } from 'src/modules/user/user.service';
 import { RegisterDto } from './dto/register-auth.dto';
 import { LoginDTO } from './dto/login-auth.dto';
@@ -9,21 +9,15 @@ import { CookieService } from 'src/utils/cookie-utils';
 import { Request, Response } from 'express';
 import { UserStatusEnum } from '@memory/shared';
 import { MailService } from '../mail/mail.service';
-import { createCache, Cache } from 'cache-manager';
-import Keyv from 'keyv';
+import { Cache } from 'cache-manager';
 import { ForgetDTO } from './dto/forget-auth.dto';
 import * as path from 'path';
 import { promises as fs } from 'fs';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
 
 @Injectable()
 export class AuthService {
-  private cache: Cache;
-  constructor(private readonly userService: UserService, private readonly cookieService: CookieService, private readonly mailService: MailService) {
-    this.cache = createCache({
-      stores: [new Keyv()],
-      ttl: 60 * 1000,
-    });
-  }
+  constructor(private readonly userService: UserService, private readonly cookieService: CookieService, private readonly mailService: MailService,@Inject(CACHE_MANAGER) private cacheManager: Cache) {}
 
   // 登录接口
   async Login(loginDto: LoginDTO, response: Response): Promise<{ userInfo: UserDTO, accessToken: string }> {
@@ -36,16 +30,7 @@ export class AuthService {
     if (!isPasswordMatched)
       throw new ForbiddenException('密码错误');
     else {
-      const userInfo = {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        password: loginDto.password,
-        avatar: user.avatar,
-        role: user.role_id,
-        status: user.status
-      }
-
+      const {last_login_at,updated_at,created_at,...userInfo} = user
       const accessToken = generateAccessToken(userInfo)
       const refreshToen = generateRefreshToken(userInfo)
 
@@ -130,14 +115,7 @@ export class AuthService {
         this.cookieService.clearTokenCookie(res, 'refreshToken', true)
         throw new ForbiddenException('用户不存在');
       }
-      const userInfo = {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        avatar: user.avatar,
-        role: user.role_id,
-        status: user.status
-      };
+      const {last_login_at,updated_at,password,created_at,...userInfo} = user
       const newAccessToken = generateAccessToken(userInfo);
       return {
         accessToken: newAccessToken
@@ -151,30 +129,28 @@ export class AuthService {
   async sendVerificationCode(email: string) {
     try {
       const lockKey = `verify_lock_${email}`;
-      const isLocked = await this.cache.get(lockKey);
+      const isLocked = await this.cacheManager.get(lockKey);
       if (isLocked) {
         throw new BadRequestException('请 60 秒后再获取验证码');
       }
       const code = Math.floor(100000 + Math.random() * 900000).toString();
-      await this.cache.set(`verify_${email}`, code, 60 * 1000);
-      await this.cache.set(lockKey, true, 60 * 1000);
-      await this.mailService.sendVerificationEmail(email, code)
+      await this.cacheManager.set(`verify_${email}`, code, 60 * 1000);
+      await this.cacheManager.set(lockKey, true, 60 * 1000);
+      await this.mailService.sendVerificationEmail(email, code);
       return { message: '验证码已发送，请检查邮箱' };
     } catch {
       return { message: '验证码发送失败，请联系管理员' };
     }
   }
 
-  // 验证
+  // 验证验证码
   async verifyCode(email: string, inputCode: string) {
-    const savedCode = await this.cache.get<string>(`verify_${email}`);
+    const savedCode = await this.cacheManager.get<string>(`verify_${email}`);
     if (!savedCode || savedCode !== inputCode) {
       throw new BadRequestException('验证码错误或已过期');
     }
-
     // 验证成功后删除验证码
-    await this.cache.del(`verify_${email}`);
-
+    await this.cacheManager.del(`verify_${email}`);
     return true;
   }
 
@@ -192,15 +168,7 @@ export class AuthService {
       user = await this.userService.create({ password: githubId, username, email, avatar });
     }
 
-    const userInfo = {
-      id: user.id,
-      username: user.username,
-      email: user.email,
-      password: user.password,
-      avatar: user.avatar,
-      role: user.role_id,
-      status: user.status
-    };
+    const {last_login_at,updated_at,created_at,...userInfo} = user
     // 这里不返回accessToken 只通过cookie来设置刷新token 用户通过github登录重定向到后台会调用info接口 此时会需要accessToken
     // 如果没有会返回401自动触发刷新接口 此时再下发accessToken，整个过程是无感的
     // const accessToken = generateAccessToken(userInfo);

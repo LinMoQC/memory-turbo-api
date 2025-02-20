@@ -12,11 +12,20 @@ import { RoleModule } from './modules/role/role.module';
 import { MailService } from './modules/mail/mail.service';
 import { GithubService } from './modules/oauth/github/github.service';
 import { JwtAuthMiddleware } from './common/middlewares/jwt.middleware';
-
+import { CacheModule } from '@nestjs/cache-manager';
+import { RedisModule } from './modules/redis/redis.module';
+import * as redisStore from 'cache-manager-redis-store';
 
 
 @Module({
-  imports: [AuthModule, UserModule, LowcodeModule, NotificationModule, RoleModule],
+  imports: [AuthModule, UserModule, LowcodeModule, NotificationModule, RoleModule,CacheModule.register({
+    store: redisStore, // 使用 Redis 作为存储
+    host: process.env.REDIS_HOST,
+    port: process.env.PORT,
+    auth_pass: process.env.PASSWORD,
+    ttl: 60,
+    isGlobal: true, 
+  }), RedisModule],
   controllers: [AppController],
   providers: [AppService, PrismaService,NotificationGateway, NotificationService, MailService, GithubService],
 })

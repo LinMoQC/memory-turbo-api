@@ -51,7 +51,7 @@ export class LowcodeController {
   @Get('all')
   findAll(@Req() req){
     const user = req.user
-    return this.lowcodeService.findAll(user.username,user.role_id)
+    return this.lowcodeService.findAll(user.username,user.role)
   }
 
   @HttpCode(200)
